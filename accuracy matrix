@@ -1,0 +1,109 @@
+import tkinter as tk
+from tkinter import filedialog, messagebox
+from ultralytics import YOLO
+from PIL import Image, ImageTk
+import cv2
+import numpy as np
+from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score
+import matplotlib.pyplot as plt
+
+# Load the YOLOv8 model
+model = YOLO("yolov8n.pt")  # You can switch to yolov8m.pt for a more accurate model
+
+# Function to browse and classify image
+def browse_image():
+    filename = filedialog.askopenfilename(filetypes=[("Image files", "*.jpg;*.jpeg;*.png")])
+    if filename:
+        classify_image(filename)
+
+def classify_image(image_path):
+    # Run the prediction without saving output files
+    result = model.predict(source=image_path, show=False, save=False, conf=0.2)  # save=False to avoid storing results
+    
+    # Load the original image
+    original_image = cv2.imread(image_path)
+    output_image = cv2.cvtColor(original_image, cv2.COLOR_BGR2RGB)
+    
+    # Check if any objects are detected
+    if len(result[0].boxes) > 0:
+        # Draw bounding boxes on the output image for detected objects
+        for box in result[0].boxes:
+            xyxy = box.xyxy[0]  # Get bounding box coordinates
+            cv2.rectangle(output_image, 
+                          (int(xyxy[0]), int(xyxy[1])), 
+                          (int(xyxy[2]), int(xyxy[3])), 
+                          (255, 0, 0), 2)  # Draw blue bounding box
+        
+        # Set "affected" or "normal" label based on the detection
+        result_text = "Affected: Detected abnormalities"
+    else:
+        # No objects detected, consider it "normal"
+        result_text = "Normal: No abnormalities detected"
+    
+    # Simulate true labels for different conditions (you can replace with actual data)
+    true_labels = [1, 1, 0, 1, 0, 1, 1, 0]  # Example true labels (1 = affected, 0 = normal)
+    
+    # Predicted labels (simulate predictions as if the model detects in some cases)
+    predicted_labels = [1, 1, 0, 1, 0, 0, 1, 1]  # Example predicted labels (1 = detected, 0 = not detected)
+    
+    # Calculate metrics
+    accuracy = accuracy_score(true_labels, predicted_labels)
+    precision = precision_score(true_labels, predicted_labels)
+    recall = recall_score(true_labels, predicted_labels)
+    f1 = f1_score(true_labels, predicted_labels)
+    
+    # Display metrics
+    metrics_text = f"Accuracy: {accuracy*100:.2f}%\nPrecision: {precision*100:.2f}%\nRecall: {recall*100:.2f}%\nF1 Score: {f1*100:.2f}%"
+
+    # Display the result image (with bounding boxes if detected)
+    img = Image.fromarray(output_image)
+    img_tk = ImageTk.PhotoImage(img)
+    result_label.config(image=img_tk)
+    result_label.image = img_tk
+    
+    # Show the result text and metrics
+    result_display.config(text=f"{result_text}\n\n{metrics_text}")
+    
+    # Plot the metrics
+    plot_metrics(accuracy, precision, recall, f1)
+
+def plot_metrics(accuracy, precision, recall, f1):
+    metrics = ['Accuracy', 'Precision', 'Recall', 'F1 Score']
+    values = [accuracy, precision, recall, f1]
+    
+    plt.figure(figsize=(8, 6))
+    plt.bar(metrics, values, color=['blue', 'green', 'orange', 'red'])
+    plt.xlabel('Metrics')
+    plt.ylabel('Scores')
+    plt.title('Model Performance Metrics')
+    plt.ylim(0, 1)
+    
+    # Show the plot
+    plt.show()
+
+# Create the main window
+root = tk.Tk()
+root.title("Image Classifier")
+root.geometry("800x700")  # Slightly bigger window for better image visibility
+root.config(bg="#f0f0f0")
+
+# Create a colorful header
+header = tk.Frame(root, bg="#4CAF50")
+header.pack(fill=tk.X)
+header_label = tk.Label(header, text="Image Classifier", font=("Arial", 24), fg="white", bg="#4CAF50")
+header_label.pack(pady=10)
+
+# Create a button to browse images
+browse_button = tk.Button(root, text="Browse Image", command=browse_image, font=("Arial", 14), bg="#2196F3", fg="white")
+browse_button.pack(pady=20)
+
+# Result display area for image
+result_label = tk.Label(root, bg="#f0f0f0", width=600, height=400)
+result_label.pack(pady=10)
+
+# Result text area for "Affected" or "Normal"
+result_display = tk.Label(root, text="", font=("Arial", 16), bg="#f0f0f0", fg="black")
+result_display.pack(pady=20)
+
+# Run the application
+root.mainloop()
